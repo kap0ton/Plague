@@ -35,7 +35,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="EPPlus">
-      <HintPath>C:\Users\kap_ton\Desktop\EPPlus 3.1.2\EPPlus.dll</HintPath>
+      <HintPath>..\..\Libraries\EPPlus.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />

@@ -1,23 +1,55 @@
-﻿using System.IO;
+﻿using System;
+using System.ComponentModel;
+using System.IO;
 using System.Windows.Forms;
 using System.Windows.Input;
+using Guarantee.Lib;
+using log4net;
 using Application = System.Windows.Application;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 namespace Guarantee
 {
-	class MainWindowVM
+	class MainWindowVM : INotifyPropertyChanged
 	{
-		private readonly MainWindowModel _model;
+		#region Properties
+
+		private readonly ILog _logger;
+
+		private MainWindowModel _model;
 		public MainWindowModel Model
 		{
 			get { return _model; }
+			set
+			{
+				_model = value;
+				OnPropertyChanged("Model");
+			}
 		}
 
-		public MainWindowVM()
+		#endregion
+
+		#region ctor
+
+		public MainWindowVM(ILog logger)
 		{
-			_model = new MainWindowModel();
+			_logger = logger;
+			Model = new MainWindowModel();
 		}
+
+		#endregion
+
+		#region Load
+
+		public void Load()
+		{
+			Model.OutputFolder = ConfigHelper.OutputFolder;
+			Model.InputFile = ConfigHelper.InputFile;
+		}
+
+		#endregion
+
+		#region Exit
 
 		private RelayCommand _exitCdm;
 		public ICommand ExitCmd
@@ -29,6 +61,33 @@ namespace Guarantee
 		{
 			Application.Current.Shutdown();
 		}
+
+		#endregion
+
+		#region Open Output Folder
+
+		private RelayCommand _openFolderCmd;
+		public ICommand OpenFolderCmd
+		{
+			get { return _openFolderCmd ?? (_openFolderCmd = new RelayCommand(p => OpenFolderDialog())); }
+		}
+
+		private void OpenFolderDialog()
+		{
+			var fbd = new FolderBrowserDialog();
+
+			if (!string.IsNullOrEmpty(Model.OutputFolder) && Directory.Exists(Model.OutputFolder))
+				fbd.SelectedPath = Model.OutputFolder;
+
+			if (fbd.ShowDialog() == DialogResult.OK)
+			{
+				Model.OutputFolder = fbd.SelectedPath;
+			}
+		}
+
+		#endregion
+
+		#region Open Input File
 
 		private RelayCommand _openFileCmd;
 		public ICommand OpenFileCmd
@@ -52,52 +111,71 @@ namespace Guarantee
 			}
 		}
 
-		private RelayCommand _openFolderCmd;
-		public ICommand OpenFolderCmd
-		{
-			get { return _openFolderCmd ?? (_openFolderCmd = new RelayCommand(p => OpenFolderDialog())); }
-		}
+		#endregion
 
-		private void OpenFolderDialog()
-		{
-			var fbd = new FolderBrowserDialog();
-
-			if (!string.IsNullOrEmpty(Model.OutputFolder) && Directory.Exists(Model.OutputFolder))
-				fbd.SelectedPath = Model.OutputFolder;
-
-			if (fbd.ShowDialog() == DialogResult.OK)
-			{
-				Model.OutputFolder = fbd.SelectedPath;
-			}
-		}
+		#region Proceed
 
 		private RelayCommand _proceedCmd;
 		public ICommand ProceedCmd
 		{
-			get
-			{
-				return _proceedCmd ?? (_proceedCmd = new RelayCommand(p=>ProceedApplication(), p=>OnCanProceedApplication()));
-			}
+			get { return _proceedCmd ?? (_proceedCmd = new RelayCommand(p => ProceedApplication(), p => OnCanProceedApplication())); }
 		}
 
 		private void ProceedApplication()
 		{
+			Model.ProceedStatuses.Clear();
 			ConfigHelper.UpdateConfigValues(Model.OutputFolder, Model.InputFile);
-			
-			//todo: proceed input file and generate tree structure
+
 			var helper = new PortfolioHelper(Model.InputFile, Model.OutputFolder);
-			helper.Proceed();
+			var worker = new BackgroundWorker {WorkerReportsProgress = true};
+			worker.DoWork += (o, ea) =>
+				                 {
+					                 _logger.Info("Proceed Started");
+					                 Application.Current.Dispatcher.Invoke(new Action(() => Model.ProceedStatuses.Add("Запуск")));
+					                 Model.IsProceedEnabled = false;
+					                 helper.Proceed(worker);
+				                 };
+			worker.ProgressChanged += (o, ea) =>
+				                          {
+					                          _logger.Info(ea.UserState.ToString());
+					                          Model.ProceedStatuses.Add(ea.UserState.ToString());
+				                          };
+			worker.RunWorkerCompleted += (o, ea) =>
+				                             {
+					                             if (ea.Error != null)
+					                             {
+						                             _logger.Error("error", ea.Error);
+						                             Model.ProceedStatuses.Add("Ошибка");
+					                             }
+					                             else
+					                             {
+						                             _logger.Info("Proceed Ended");
+						                             Model.ProceedStatuses.Add("Завершено");
+					                             }
+					                             Model.IsProceedEnabled = true;
+					                             CommandManager.InvalidateRequerySuggested();
+				                             };
+			worker.RunWorkerAsync();
 		}
 
 		private bool OnCanProceedApplication()
 		{
-			return !string.IsNullOrEmpty(Model.InputFile) && !string.IsNullOrEmpty(Model.OutputFolder);
+			return !string.IsNullOrEmpty(Model.InputFile) && !string.IsNullOrEmpty(Model.OutputFolder) && Model.IsProceedEnabled;
 		}
 
-		public void Load()
+		#endregion
+
+		#region INotifyPropertyChanged
+
+		public event PropertyChangedEventHandler PropertyChanged;
+
+		protected virtual void OnPropertyChanged(string propertyName)
 		{
-			Model.OutputFolder = ConfigHelper.OutputFolder;
-			Model.InputFile = ConfigHelper.InputFile;
+			var handler = PropertyChanged;
+			if (handler != null)
+				handler(this, new PropertyChangedEventArgs(propertyName));
 		}
+
+		#endregion
 	}
 }

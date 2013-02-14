@@ -1,10 +1,9 @@
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using Guarantee.Annotations;
+﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace Guarantee
 {
-	class MainWindowModel : INotifyPropertyChanged
+	public class MainWindowModel : INotifyPropertyChanged
 	{
 		private string _outputFolder;
 		public string OutputFolder
@@ -13,7 +12,7 @@ namespace Guarantee
 			set
 			{
 				_outputFolder = value;
-				OnPropertyChanged();
+				OnPropertyChanged("OutputFolder");
 			}
 		}
 
@@ -24,18 +23,43 @@ namespace Guarantee
 			set
 			{
 				_inputFile = value;
-				OnPropertyChanged();
+				OnPropertyChanged("InputFile");
 			}
 		}
 
+		private bool _isProceedEnabled;
+		public bool IsProceedEnabled
+		{
+			get { return _isProceedEnabled; }
+			set
+			{
+				_isProceedEnabled = value;
+				OnPropertyChanged("IsProceedEnabled");
+			}
+		}
+
+		private ObservableCollection<string> _proceedStatuses;
+		public ObservableCollection<string> ProceedStatuses
+		{
+			get { return _proceedStatuses ?? (_proceedStatuses = new ObservableCollection<string>()); }
+		}
+
+		public MainWindowModel()
+		{
+			IsProceedEnabled = true;
+		}
+
+		#region INotifyPropertyChanged
+
 		public event PropertyChangedEventHandler PropertyChanged;
 
-		[NotifyPropertyChangedInvocator]
-		protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+		protected virtual void OnPropertyChanged(string propertyName = null)
 		{
-			PropertyChangedEventHandler handler = PropertyChanged;
+			var handler = PropertyChanged;
 			if (handler != null)
 				handler(this, new PropertyChangedEventArgs(propertyName));
 		}
+
+		#endregion
 	}
 }

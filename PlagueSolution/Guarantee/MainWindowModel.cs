@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
+using Guarantee.Annotations;
 
 namespace Guarantee
 {
@@ -24,6 +25,17 @@ namespace Guarantee
 			{
 				_inputFile = value;
 				OnPropertyChanged("InputFile");
+			}
+		}
+
+		private string _completedFolder;
+		public string CompletedFolder
+		{
+			get { return _completedFolder; }
+			set
+			{
+				_completedFolder = value;
+				OnPropertyChanged("CompletedFolder");
 			}
 		}
 
@@ -53,7 +65,8 @@ namespace Guarantee
 
 		public event PropertyChangedEventHandler PropertyChanged;
 
-		protected virtual void OnPropertyChanged(string propertyName = null)
+		[NotifyPropertyChangedInvocator]
+		protected virtual void OnPropertyChanged(string propertyName)
 		{
 			var handler = PropertyChanged;
 			if (handler != null)

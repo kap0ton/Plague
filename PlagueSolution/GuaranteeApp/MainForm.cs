@@ -61,7 +61,7 @@ namespace GuaranteeApp
 			try
 			{
 				//todo: proceed input file and generate tree structure
-				var helper = new PortfolioHelper(InputFilePath, OutputFolderPath);
+				var helper = new PortfolioHelper(InputFilePath, OutputFolderPath, string.Empty);
 				helper.Proceed();
 			}
 			catch (Exception ex)

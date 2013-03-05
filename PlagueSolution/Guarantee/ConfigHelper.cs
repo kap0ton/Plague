@@ -6,34 +6,33 @@ namespace Guarantee
 	{
 		private const string OutputFolderPath = "OutputFolderPath";
 		private const string InputFilePath = "InputFilePath";
+		private const string CompletedFolderPath = "CompletedFolderPath";
 
-		public static void UpdateConfigValues(string outputFolder, string inputFile)
+		#region helper methods
+
+		public static void UpdateConfigValues(string outputFolder, string inputFile, string completedFolder)
 		{
 			var configuration = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-
-			//output folder path
-			if (configuration.AppSettings.Settings[OutputFolderPath] != null)
-			{
-				configuration.AppSettings.Settings[OutputFolderPath].Value = outputFolder;
-			}
-			else
-			{
-				configuration.AppSettings.Settings.Add(OutputFolderPath, outputFolder);
-			}
-
-			//input file path
-			if (configuration.AppSettings.Settings[InputFilePath] != null)
-			{
-				configuration.AppSettings.Settings[InputFilePath].Value = inputFile;
-			}
-			else
-			{
-				configuration.AppSettings.Settings.Add(InputFilePath, inputFile);
-			}
-
+			UpdateConfigSection(configuration, OutputFolderPath, outputFolder);
+			UpdateConfigSection(configuration, InputFilePath, inputFile);
+			UpdateConfigSection(configuration, CompletedFolderPath, completedFolder);
 			configuration.Save(ConfigurationSaveMode.Modified);
 			ConfigurationManager.RefreshSection("appSettings");
 		}
+
+		private static void UpdateConfigSection(Configuration configuration, string key, string value)
+		{
+			if (configuration.AppSettings.Settings[key] != null)
+			{
+				configuration.AppSettings.Settings[key].Value = value;
+			}
+			else
+			{
+				configuration.AppSettings.Settings.Add(key, value);
+			}
+		}
+
+		#endregion
 
 		public static string OutputFolder
 		{
@@ -43,6 +42,11 @@ namespace Guarantee
 		public static string InputFile
 		{
 			get { return ConfigurationManager.AppSettings[InputFilePath]; }
+		}
+
+		public static string CompletedFolder
+		{
+			get { return ConfigurationManager.AppSettings[CompletedFolderPath]; }
 		}
 	}
 }

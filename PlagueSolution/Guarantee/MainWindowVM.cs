@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows.Forms;
 using System.Windows.Input;
+using Guarantee.Annotations;
 using Guarantee.Lib;
 using log4net;
 using Application = System.Windows.Application;
@@ -45,6 +46,7 @@ namespace Guarantee
 		{
 			Model.OutputFolder = ConfigHelper.OutputFolder;
 			Model.InputFile = ConfigHelper.InputFile;
+			Model.CompletedFolder = ConfigHelper.CompletedFolder;
 		}
 
 		#endregion
@@ -113,9 +115,33 @@ namespace Guarantee
 
 		#endregion
 
+		#region Open Completed Folder
+
+		private RelayCommand _completedCmd;
+		public ICommand CompletedCmd
+		{
+			get { return _completedCmd ?? (_completedCmd = new RelayCommand(p => OpenCompletedFolderDialog())); }
+		}
+
+		private void OpenCompletedFolderDialog()
+		{
+			var fbd = new FolderBrowserDialog();
+
+			if (!string.IsNullOrEmpty(Model.CompletedFolder) && Directory.Exists(Model.CompletedFolder))
+				fbd.SelectedPath = Model.CompletedFolder;
+
+			if (fbd.ShowDialog() == DialogResult.OK)
+			{
+				Model.CompletedFolder = fbd.SelectedPath;
+			}
+		}
+
+		#endregion
+
 		#region Proceed
 
 		private RelayCommand _proceedCmd;
+
 		public ICommand ProceedCmd
 		{
 			get { return _proceedCmd ?? (_proceedCmd = new RelayCommand(p => ProceedApplication(), p => OnCanProceedApplication())); }
@@ -124,43 +150,46 @@ namespace Guarantee
 		private void ProceedApplication()
 		{
 			Model.ProceedStatuses.Clear();
-			ConfigHelper.UpdateConfigValues(Model.OutputFolder, Model.InputFile);
+			ConfigHelper.UpdateConfigValues(Model.OutputFolder, Model.InputFile, Model.CompletedFolder);
 
-			var helper = new PortfolioHelper(Model.InputFile, Model.OutputFolder);
+			var helper = new PortfolioHelper(Model.InputFile, Model.OutputFolder, Model.CompletedFolder);
 			var worker = new BackgroundWorker {WorkerReportsProgress = true};
 			worker.DoWork += (o, ea) =>
-				                 {
-					                 _logger.Info("Proceed Started");
-					                 Application.Current.Dispatcher.Invoke(new Action(() => Model.ProceedStatuses.Add("Запуск")));
-					                 Model.IsProceedEnabled = false;
-					                 helper.Proceed(worker);
-				                 };
+				{
+					_logger.Info("Proceed Started");
+					Application.Current.Dispatcher.Invoke(new Action(() => Model.ProceedStatuses.Add("Запуск")));
+					Model.IsProceedEnabled = false;
+					helper.Proceed(worker);
+				};
 			worker.ProgressChanged += (o, ea) =>
-				                          {
-					                          _logger.Info(ea.UserState.ToString());
-					                          Model.ProceedStatuses.Add(ea.UserState.ToString());
-				                          };
+				{
+					_logger.Info(ea.UserState.ToString());
+					Model.ProceedStatuses.Add(ea.UserState.ToString());
+				};
 			worker.RunWorkerCompleted += (o, ea) =>
-				                             {
-					                             if (ea.Error != null)
-					                             {
-						                             _logger.Error("error", ea.Error);
-						                             Model.ProceedStatuses.Add("Ошибка");
-					                             }
-					                             else
-					                             {
-						                             _logger.Info("Proceed Ended");
-						                             Model.ProceedStatuses.Add("Завершено");
-					                             }
-					                             Model.IsProceedEnabled = true;
-					                             CommandManager.InvalidateRequerySuggested();
-				                             };
+				{
+					if (ea.Error != null)
+					{
+						_logger.Error("error", ea.Error);
+						Model.ProceedStatuses.Add("Ошибка");
+					}
+					else
+					{
+						_logger.Info("Proceed Ended");
+						Model.ProceedStatuses.Add("Завершено");
+					}
+					Model.IsProceedEnabled = true;
+					CommandManager.InvalidateRequerySuggested();
+				};
 			worker.RunWorkerAsync();
 		}
 
 		private bool OnCanProceedApplication()
 		{
-			return !string.IsNullOrEmpty(Model.InputFile) && !string.IsNullOrEmpty(Model.OutputFolder) && Model.IsProceedEnabled;
+			return !string.IsNullOrEmpty(Model.InputFile)
+			       && !string.IsNullOrEmpty(Model.OutputFolder)
+			       && !string.IsNullOrEmpty(Model.CompletedFolder)
+			       && Model.IsProceedEnabled;
 		}
 
 		#endregion
@@ -169,11 +198,11 @@ namespace Guarantee
 
 		public event PropertyChangedEventHandler PropertyChanged;
 
+		[NotifyPropertyChangedInvocator]
 		protected virtual void OnPropertyChanged(string propertyName)
 		{
 			var handler = PropertyChanged;
-			if (handler != null)
-				handler(this, new PropertyChangedEventArgs(propertyName));
+			if (handler != null) handler(this, new PropertyChangedEventArgs(propertyName));
 		}
 
 		#endregion
